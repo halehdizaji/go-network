@@ -271,13 +271,17 @@ func (strategy *PreservationRandomNodeNeighbourSampling) Sample(graph Undirected
 	}
 
 	expectedFinalGraphSize := int(float32(len(graph.Nodes)) * sampledGraphSizeRatio)
+	nodes := GetDictKeys(graph.Nodes)
 
 	for len(ng.Nodes) <= expectedFinalGraphSize {
-		nodes := GetDictKeys(graph.Nodes)
 		nodeIndex := rand.Perm(len(nodes))[0]
-		neighbours := graph.Edges[nodes[nodeIndex]]
+		node := nodes[nodeIndex]
+		ng.AddNode(node)
+		neighbours := graph.Edges[node]
 		neighbourIndex := rand.Perm(len(neighbours))[0]
-		ng.AddNode(neighbours[neighbourIndex])
+		neighbour := neighbours[neighbourIndex]
+		ng.AddNode(neighbour)
+		ng.AddEdge(Edge{Node1: node, Node2: neighbour})
 	}
 	return ng, nil
 }
@@ -293,10 +297,29 @@ func (strategy *PreservationInclusiveRandomNodeNeighbourSampling) Sample(graph U
 	for len(ng.Nodes) <= expectedFinalGraphSize {
 		nodes := GetDictKeys(graph.Nodes)
 		nodeIndex := rand.Perm(len(nodes))[0]
-		neighbours := graph.Edges[nodes[nodeIndex]]
+		node := nodes[nodeIndex]
+		neighbours := graph.Edges[node]
 		neighbourIndex := rand.Perm(len(neighbours))[0]
-		ng.AddNode(nodes[nodeIndex])
-		ng.AddNode(neighbours[neighbourIndex])
+		neighbour := neighbours[neighbourIndex]
+		ng_nodes := GetDictKeys(ng.Nodes)
+		ng.AddNode(node)
+		for _, ng_node := range ng_nodes {
+			for _, sample_neighbour := range neighbours {
+				if ng_node == sample_neighbour {
+					ng.AddEdge(Edge{Node1: node, Node2: ng_node})
+				}
+			}
+		}
+		ng.AddNode(neighbour)
+		ng.AddEdge(Edge{Node1: node, Node2: neighbour})
+		neighbours_of_neighbour := graph.Edges[neighbour]
+		for _, ng_node := range ng_nodes {
+			for _, sample_neighbour := range neighbours_of_neighbour {
+				if ng_node == sample_neighbour {
+					ng.AddEdge(Edge{Node1: neighbour, Node2: ng_node})
+				}
+			}
+		}
 	}
 	return ng, nil
 }
@@ -386,7 +409,7 @@ func (strategy *PreservationRandomNodeEdgeSampling) Sample(g UndirectedGraph, sa
 			newNodes[edges[edgeIndex].Node1] = true
 			newNodes[edges[edgeIndex].Node2] = true
 			if expectedFinalGraphSize <= len(newNodes) {
-				break
+				return ng, nil
 			}
 		}
 	}
@@ -443,7 +466,7 @@ func (strategy *PreservationRandomWalkSampling) Sample(graph UndirectedGraph, sa
 		neighbors := graph.Edges[currentNode]
 		if len(neighbors) > 0 {
 			nextNode := neighbors[rand.Intn(len(neighbors))]
-			ng.AddNode(currentNode)
+			ng.AddEdge(Edge{Node1: currentNode, Node2: nextNode})
 			// c value taken from Leskovec, Jure, and Christos Faloutsos. "Sampling from large graphs." Proceedings of the 12th ACM SIGKDD international conference on Knowledge discovery and data mining. 2006.
 			currentNode = nextNode
 		} else {
@@ -466,24 +489,33 @@ func (strategy *PreservationRandomWalkWithRestartSampling) Sample(graph Undirect
 
 	startNode := graph.pickRandomNode()
 	neighbors := graph.Edges[startNode]
-	nodeToInclude := neighbors[rand.Intn(len(neighbors))]
+	for {
+		if len(neighbors) > 0 {
+			break
+		} else {
+			startNode = graph.pickRandomNode()
+			neighbors = graph.Edges[startNode]
+		}
+	}
+	//nodeToInclude := neighbors[rand.Intn(len(neighbors))]
+	currentNode := startNode
 
 	for {
-		neighbors := graph.Edges[nodeToInclude]
+		//neighbors := graph.Edges[nodeToInclude]
 		if len(neighbors) > 0 {
 			nextNode := neighbors[rand.Intn(len(neighbors))]
-			ng.AddNode(nodeToInclude)
+			ng.AddEdge(Edge{Node1: currentNode, Node2: nextNode})
 			// c value taken from Leskovec, Jure, and Christos Faloutsos. "Sampling from large graphs." Proceedings of the 12th ACM SIGKDD international conference on Knowledge discovery and data mining. 2006.
 			if rand.Float32() < 0.15 {
-				neighbors = graph.Edges[startNode]
-				nodeToInclude = neighbors[rand.Intn(len(neighbors))]
+				currentNode = startNode
 			} else {
-				nodeToInclude = nextNode
+				currentNode = nextNode
 			}
+			neighbors = graph.Edges[currentNode]
 		} else {
 			// If the current node has no neighbors, go to first node
-			neighbors = graph.Edges[startNode]
-			nodeToInclude = neighbors[rand.Intn(len(neighbors))]
+			currentNode = startNode
+			neighbors = graph.Edges[currentNode]
 		}
 		if expectedFinalGraphSize <= len(ng.Nodes) {
 			break
@@ -506,7 +538,7 @@ func (strategy *PreservationRandomWalkWithJumpSampling) Sample(graph UndirectedG
 		neighbors := graph.Edges[currentNode]
 		if len(neighbors) > 0 {
 			nextNode := neighbors[rand.Intn(len(neighbors))]
-			ng.AddNode(currentNode)
+			ng.AddEdge(Edge{Node1: currentNode, Node2: nextNode})
 			// c value taken from Leskovec, Jure, and Christos Faloutsos. "Sampling from large graphs." Proceedings of the 12th ACM SIGKDD international conference on Knowledge discovery and data mining. 2006.
 			if rand.Float32() < 0.15 {
 				currentNode = ng.pickRandomNode()
