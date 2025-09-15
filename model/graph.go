@@ -372,6 +372,47 @@ func (g *UndirectedGraph) RemoveEdge(edge Edge) {
 }
 
 /*
+HasEode checks if the UndirectedGraph contains a specific edge.
+
+Parameters:
+- edge: .
+
+Returns:
+- bool: True if the edge exists in the graph, otherwise false.
+
+Description:
+The function returns true if the specified edge is present in the UndirectedGraph, indicating its existence in the graph. Otherwise, it returns false.
+
+Example:
+
+	undirectedGraph := UndirectedGraph{
+		Nodes: map[Node]bool{
+			1: true,
+			2: true,
+			3: true,
+			4: true,
+		},
+		Edges: map[Node][]Node{
+			1: {2, 3, 4},
+			2: {1, 3},
+			3: {1, 2, 4},
+			4: {1, 3},
+		},
+	}
+
+	result1 := undirectedGraph.HasEdge(2,3) // true
+	result2 := undirectedGraph.HasNode(4,2) // false
+*/
+func (g *UndirectedGraph) HasEdge(u, v Node) bool {
+	for _, nb := range g.Edges[u] {
+		if nb == v {
+			return true
+		}
+	}
+	return false
+}
+
+/*
 RemoveNode removes a node from the UndirectedGraph and all associated edges.
 
 Parameters:
