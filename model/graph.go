@@ -126,6 +126,7 @@ Example:
 
 	fmt.Println(undirectedGraph.Edges) // Output: map[1:[2] 2:[1]]
 */
+
 func (g *UndirectedGraph) AddEdge(edge Edge) {
 	// Ensure the existence of the Edges map
 	if g.Edges == nil {
@@ -136,9 +137,11 @@ func (g *UndirectedGraph) AddEdge(edge Edge) {
 	g.AddNode(edge.Node1)
 	g.AddNode(edge.Node2)
 
-	// Add the edge to the Edges map
-	g.Edges[edge.Node1] = append(g.Edges[edge.Node1], edge.Node2)
-	g.Edges[edge.Node2] = append(g.Edges[edge.Node2], edge.Node1)
+	// Only add if edge doesn’t already exist (undirected)
+	if !g.HasEdge(edge.Node1, edge.Node2) {
+		g.Edges[edge.Node1] = append(g.Edges[edge.Node1], edge.Node2)
+		g.Edges[edge.Node2] = append(g.Edges[edge.Node2], edge.Node1)
+	}
 }
 
 func (g *UndirectedGraph) DFS(startNode Node) *UndirectedGraph {
