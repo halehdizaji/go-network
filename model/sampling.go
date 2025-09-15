@@ -239,6 +239,7 @@ type PreservationRandomWalkSampling struct{ ISamplingStrategy }
 type PreservationRandomWalkWithJumpSampling struct{ ISamplingStrategy }
 type PreservationRandomWalkWithRestartSampling struct{ ISamplingStrategy }
 type PreservationTopKEdgeSampling struct{ ISamplingStrategy }
+type PreservationTopRatioEdgeSampling struct{ ISamplingStrategy }
 
 func (strategy *PreservationRandomNodeSampling) Sample(g UndirectedGraph, sampledGraphSizeRatio float32) (UndirectedGraph, error) {
 	ng := UndirectedGraph{
@@ -557,7 +558,7 @@ func (strategy *PreservationRandomWalkWithJumpSampling) Sample(graph UndirectedG
 	return ng, nil
 }
 
-func (strategy *PreservationTopKEdgeSampling) Sample(
+func (strategy *PreservationTopRatioEdgeSampling) Sample(
 	g UndirectedGraph,
 	sampleNeighborRatio float32, // e.g., 0.3 keeps top 30% per node
 ) (UndirectedGraph, error) {
@@ -616,6 +617,48 @@ func (strategy *PreservationTopKEdgeSampling) Sample(
 		}
 	}
 
+	return ng, nil
+}
+
+func (strategy *PreservationTopKEdgeSampling) Sample(g UndirectedGraph, sampledGraphSizeRatio float32) (UndirectedGraph, error) {
+	// TODO: where do we get the K parameter?
+	// shall we change the interface to passing sampling parameters object?
+	// and some Factory, to create the appropriate map of parameters
+	topK := 5
+	ng := UndirectedGraph{
+		Nodes: make(map[Node]bool),
+		Edges: make(map[Node][]Node),
+	}
+
+	for nodeId := range g.Nodes {
+		neighbours := g.Edges[nodeId]
+		if len(neighbours) == 0 {
+			continue
+		}
+		weightedNeighbours := make([]WeightedElement, 0)
+		for k := 0; k < len(neighbours); k++ {
+			weightedNeighbours = append(weightedNeighbours, WeightedElement{
+				Payload: neighbours[k],
+				Weight:  float32(g.NodeDegree(neighbours[k])),
+			})
+		}
+		sort.SliceStable(weightedNeighbours, func(i, j int) bool {
+			return weightedNeighbours[i].Weight > weightedNeighbours[j].Weight
+		})
+
+		topK_adjusted := min(topK, len(neighbours))
+
+		for idx := 0; idx < topK_adjusted; idx++ {
+			nodeId_1 := nodeId
+			nodeId_2 := weightedNeighbours[idx].Payload.(Node)
+			if !ng.HasEdge(nodeId_1, nodeId_2) {
+				ng.AddEdge(Edge{
+					Node1: nodeId_1,
+					Node2: nodeId_2,
+				})
+			}
+		}
+	}
 	return ng, nil
 }
 
